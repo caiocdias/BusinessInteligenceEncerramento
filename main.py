@@ -37,7 +37,7 @@ coletores_criticidade["CRITICIDADE"] = coletores_criticidade["CRITICIDADE"].asty
 coletores_criticidade["COD_UNIV"] = coletores_criticidade["COD_UNIV"].fillna(0).astype('int64')
 coletores_criticidade["QteColetores"] = coletores_criticidade["QteColetores"].astype('int64')
 
-with open(r"./access/database.json", "r", encoding="utf-8-sig") as file:
+with open(r"/home/zeny/repos/BusinessInteligenceEncerramento/access/database.json", "r", encoding="utf-8-sig") as file:
     access_json_database = json.load(file)
 
 database_connection = DatabaseConnection(access_json_database["username"], access_json_database["password"], access_json_database["server"], access_json_database["database"])
@@ -61,7 +61,7 @@ database_connection.__del__()
 
 base_notas = (coletores_criticidade.groupby(["NUM_NS", "COD_POLO_CTRAB", "MODALIDADE", "PRAZO_ENTE", "CRITICIDADE"], as_index=False, dropna=False)["BASE_CR"].sum(min_count=1).rename(columns={"BASE_CR": "SOMA_BASE_CR"}))
 
-csv_db_base_cr_path = r"./database/db_base_cr.csv"
+csv_db_base_cr_path = r"/home/zeny/repos/BusinessInteligenceEncerramento/database/db_base_cr.csv"
 
 novas_linhas = (base_notas.loc[:, ["NUM_NS", "SOMA_BASE_CR"]].copy().assign(DATA=pd.Timestamp.today().strftime("%d/%m/%Y")))
 
