@@ -5,8 +5,8 @@ import pandas as pd
 from models.DatabaseConnection import DatabaseConnection
 import re
 
-path_base_cr_pend = r"./export/base_cr.xlsx"
-
+path_base_cr_pend = r"/mnt/administrativo/GESTÃO/Encerramento/db_export/base_cr.xlsx"
+path_base_acoes_conc = r"/mnt/administrativo/GESTÃO/Encerramento/db_export/acoes_conc.xlsx"
 
 coletores_criticidade = pd.read_excel(r"\\192.168.10.5\projetos\0915 -Encerramento\BaseDados\COLETORES DE CRITICIDADE.xlsx")
 
@@ -135,7 +135,7 @@ acoes_conc = acoes_conc.sort_values("ACOES_DAT_CONCLUSAO_DT", ascending=False)
 acoes_conc["ACOES_DAT_CONCLUSAO"] = acoes_conc["ACOES_DAT_CONCLUSAO_DT"].dt.strftime("%d/%m/%Y")
 acoes_conc = acoes_conc.drop(columns=["ACOES_DAT_CONCLUSAO_DT", "DATA_DT"])
 
-acoes_conc.to_excel(r"./export/acoes_conc.xlsx", index=False)
+acoes_conc.to_excel(path_base_acoes_conc, index=False)
 
 acoes_conc = acoes_conc.copy()
 acoes_conc["SOMA_BASE_CR"] = pd.to_numeric(acoes_conc["SOMA_BASE_CR"], errors="coerce")
