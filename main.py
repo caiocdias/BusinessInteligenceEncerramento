@@ -7,8 +7,8 @@ import re
 
 path_base_cr_pend = r"/mnt/administrativo/GESTÃO/Encerramento/db_export/base_cr.xlsx"
 path_base_acoes_conc = r"/mnt/administrativo/GESTÃO/Encerramento/db_export/acoes_conc.xlsx"
-
-coletores_criticidade = pd.read_excel(r"\\192.168.10.5\projetos\0915 -Encerramento\BaseDados\COLETORES DE CRITICIDADE.xlsx")
+path_base_resumo = r"/mnt/administrativo/GESTÃO/Encerramento/db_export/resumo.xlsx"
+coletores_criticidade = pd.read_excel(r"/mnt/administrativo/GESTÃO/Encerramento/Base de Dados/COLETORES DE CRITICIDADE.xlsx")
 
 coletores_criticidade = coletores_criticidade[(coletores_criticidade['NUM_ORDEM'].str.contains('Filtro') == False)]
 
@@ -230,4 +230,4 @@ for c in ["qtd_ns_concl", "qtd_ns_trab"]:
 resumo = resumo.sort_values(["USUARIOS_NOM", "DATA"]).reset_index(drop=True)
 resumo["DATA"] = resumo["DATA"].dt.strftime("%d/%m/%Y")
 resumo.rename(columns={"DATA": "Data", "USUARIOS_NOM": "Usuário", "qtd_ns_concl": "NS Concluídas", "base_cr_concl": "Base Cr. Concluída", "qtd_ns_trab": "NS Trabalhadas", "base_cr_trab": "Base Cr. Trabalhada"}, inplace=True)
-resumo.to_excel(r"./export/resumo.xlsx", index=False)
+resumo.to_excel(path_base_resumo, index=False)
