@@ -3,6 +3,7 @@ import os
 from models import *
 import pandas as pd
 from models.DatabaseConnection import DatabaseConnection
+import re
 
 path_base_cr_pend = r"./export/base_cr.xlsx"
 
@@ -135,3 +136,98 @@ acoes_conc["ACOES_DAT_CONCLUSAO"] = acoes_conc["ACOES_DAT_CONCLUSAO_DT"].dt.strf
 acoes_conc = acoes_conc.drop(columns=["ACOES_DAT_CONCLUSAO_DT", "DATA_DT"])
 
 acoes_conc.to_excel(r"./export/acoes_conc.xlsx", index=False)
+
+acoes_conc = acoes_conc.copy()
+acoes_conc["SOMA_BASE_CR"] = pd.to_numeric(acoes_conc["SOMA_BASE_CR"], errors="coerce")
+acoes_conc["ACOES_DAT_CONCLUSAO_DT"] = pd.to_datetime(
+    acoes_conc["ACOES_DAT_CONCLUSAO"], format="%d/%m/%Y", errors="coerce"
+)
+
+# ===== 1) CONCLUSÕES POR DIA =====
+conclusoes_diario = (
+    acoes_conc.dropna(subset=["ACOES_DAT_CONCLUSAO_DT"])
+    .groupby(["USUARIOS_NOM", "ACOES_DAT_CONCLUSAO_DT"], as_index=False)
+    .agg(
+        qtd_ns_concl=("NUM_NS", "nunique"),   # contagem de NS distintas
+        base_cr_concl=("SOMA_BASE_CR", "sum") # soma base_cr nas conclusões do dia
+    )
+    .rename(columns={"ACOES_DAT_CONCLUSAO_DT": "DATA"})
+)
+
+# ===== 2) TRABALHO POR DIA (regex em ACOES_OBS) =====
+# casa dd/mm e opcionalmente /aaaa
+pat = re.compile(r"(?<!\d)(\d{1,2})/(\d{1,2})(?:/(\d{4}))?(?!\d)")
+
+hoje = pd.Timestamp.today()
+
+registros = []
+for _, row in acoes_conc.iterrows():
+    dt_conc = row["ACOES_DAT_CONCLUSAO_DT"]  # pode ser NaT
+    dt_ref = dt_conc if pd.notna(dt_conc) else hoje  # ano de referência
+
+    obs = row.get("ACOES_OBS", None)
+    if pd.isna(obs):
+        continue
+
+    for m in pat.finditer(str(obs)):
+        d = int(m.group(1))
+        mth = int(m.group(2))
+        ano_match = m.group(3)  # None se veio só dd/mm
+
+        # sanity check básico
+        if not (1 <= d <= 31 and 1 <= mth <= 12):
+            continue
+
+        if ano_match:
+            # já veio o ano completo em ACOES_OBS -> usa direto
+            ano = int(ano_match)
+        else:
+            # sem ano explícito: aplica regra
+            if pd.notna(dt_conc):
+                # se dd/mm observado é posterior ao dd/mm da conclusão -> ano = ano_conc - 1
+                ano = dt_ref.year - 1 if (mth, d) > (dt_ref.month, dt_ref.day) else dt_ref.year
+            else:
+                # conclusão vazia -> usar ano de hoje (sem "ano-1")
+                ano = dt_ref.year
+
+        # valida a data (pula casos como 31/02)
+        try:
+            dt_trab = pd.Timestamp(year=ano, month=mth, day=d)
+        except ValueError:
+            continue
+
+        registros.append({
+            "USUARIOS_NOM": row["USUARIOS_NOM"],
+            "DATA": dt_trab,
+            "NUM_NS": row["NUM_NS"],
+            "SOMA_BASE_CR": row["SOMA_BASE_CR"],
+        })
+
+df_trab = pd.DataFrame(registros)
+
+if not df_trab.empty:
+    # evita duplo cômputo da mesma NS no mesmo dia/usuário
+    df_trab = df_trab.drop_duplicates(subset=["USUARIOS_NOM", "DATA", "NUM_NS"])
+
+    trab_diario = (
+        df_trab.groupby(["USUARIOS_NOM", "DATA"], as_index=False)
+        .agg(
+            qtd_ns_trab=("NUM_NS", "nunique"),
+            base_cr_trab=("SOMA_BASE_CR", "sum")
+        )
+    )
+else:
+    trab_diario = pd.DataFrame(columns=["USUARIOS_NOM", "DATA", "qtd_ns_trab", "base_cr_trab"])
+
+# ===== 3) RESUMO (outer join) =====
+resumo = (
+    conclusoes_diario.merge(trab_diario, on=["USUARIOS_NOM", "DATA"], how="outer")
+    .fillna({"qtd_ns_concl": 0, "base_cr_concl": 0, "qtd_ns_trab": 0, "base_cr_trab": 0})
+)
+for c in ["qtd_ns_concl", "qtd_ns_trab"]:
+    resumo[c] = resumo[c].astype("int64")
+
+resumo = resumo.sort_values(["USUARIOS_NOM", "DATA"]).reset_index(drop=True)
+resumo["DATA"] = resumo["DATA"].dt.strftime("%d/%m/%Y")
+resumo.rename(columns={"DATA": "Data", "USUARIOS_NOM": "Usuário", "qtd_ns_concl": "NS Concluídas", "base_cr_concl": "Base Cr. Concluída", "qtd_ns_trab": "NS Trabalhadas", "base_cr_trab": "Base Cr. Trabalhada"}, inplace=True)
+resumo.to_excel(r"./export/resumo.xlsx", index=False)
